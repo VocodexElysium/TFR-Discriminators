@@ -1,1 +1,1812 @@
-<h1>Hello!</h1>
+<!DOCTYPE html>
+<html lang="en-US">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Hugo 0.88.1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,700" type="text/css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/styles/github.min.css">
+  <link rel="stylesheet" href="css/custom.css">
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+
+  <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+      </script>
+  <script type="text/javascript"
+    src="http://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+
+  <title>An Investigation of Time-Frequency Representation Discriminators for High-Fidelity Vocoder</title>
+
+  <style>
+    .black_overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.93);
+      z-index: 100;
+    }
+
+    .enlargeContainer {
+      display: none;
+    }
+
+    .enlargePreviewImg {
+      /*这里我设置的是：预览后放大的图片相对于整个页面定位*/
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+
+      /*宽度设置为页面宽度的70%，高度自适应*/
+      width: 70%;
+      z-index: 200;
+    }
+
+    /*关闭预览*/
+    .close {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      z-index: 200;
+    }
+  </style>
+
+</head>
+
+<!--黑色遮罩-->
+<div class="black_overlay" id="black_overlay"></div>
+
+<!--预览容器，存放点击放大后的图片-->
+<div class="enlargeContainer" id="enlargeContainer">
+  <!-- 关闭按钮，一个叉号图片 -->
+  <img src="assets/pics/close_pic.png" class="close" id="close">
+</div>
+
+<body data-new-gr-c-s-check-loaded="14.1091.0" data-gr-ext-installed="">
+
+  <div class="container">
+    <header role="banner"></header>
+    <main role="main">
+      <article itemscope itemtype="https://schema.org/BlogPosting">
+
+        <div class="container pt-5 mt-5 shadow p-5 mb-5 bg-white rounded">
+          <div class="text-center">
+            <h1>An Investigation of Time-Frequency Representation Discriminators for High-Fidelity Vocoder </h1>
+          </div>
+          <br>
+          <p class="text-center">
+            <b>
+              <a href="https://www.yichenggu.com/" class="plainhref">Yicheng Gu</a>, <a
+                href="https://www.zhangxueyao.com/" class="plainhref">Xueyao Zhang</a>, <a
+                href="https://scholar.google.com/citations?user=KNqxVT0AAAAJ&hl=zh-CN" class="plainhref">Liumeng
+                Xue</a>,
+              <a href="https://www.colips.org/~eleliha/" class="plainhref">Haizhou Li</a>,
+              <a href="https://drwuz.com/" class="plainhref">Zhizheng Wu</a>
+            </b>
+          </p>
+          <p class="text-center">
+            School of Data Science, The Chinese University of Hong Kong, Shenzhen
+          </p>
+          <font size="+1">
+            <p style="text-align: center;">
+              <a href="https://arxiv.org/abs/2404.17161" target="_blank">[Paper]</a>
+              <a href="https://github.com/open-mmlab/Amphion" target="_blank">[Code]</a>
+            </p>
+          </font>
+        </div>
+
+        <div class="container pt-5 mt-5 shadow p-5 mb-5 bg-white rounded">
+          <h2 id="content-samples" style="text-align: center;">Abstract </h2>
+          <p>
+            Generative Adversarial Network (GAN) based vocoders are superior in both inference speed and synthesis
+            quality when reconstructing an audible waveform from an acoustic representation. This study focuses on
+            improving the discriminator for GAN-based vocoders. Most existing Time-Frequency Representation (TFR)-based
+            discriminators are rooted in Short-Time Fourier Transform (STFT), which owns a constant Time-Frequency (TF)
+            resolution, linearly scaled center frequencies, and a fixed decomposition basis, making it incompatible with
+            signals like singing voices that require dynamic attention for different frequency bands and different time
+            intervals. Motivated by that, we propose a Multi-Scale Sub-Band Constant-Q Transform CQT (MS-SB-CQT)
+            discriminator and a Multi-Scale Temporal-Compressed Continuous Wavelet Transform CWT (MS-TC-CWT)
+            discriminator. Both CQT and CWT have a dynamic TF resolution for different frequency bands. In contrast, CQT
+            has a better modeling ability in pitch information, and CWT has a better modeling ability in short-time
+            transients. Experiments conducted on both speech and singing voices confirm the effectiveness of our
+            proposed discriminators. Moreover, the STFT, CQT, and CWT-based discriminators can be used jointly for
+            better performance. The proposed discriminators can boost the synthesis quality of various state-of-the-art
+            GAN-based vocoders, including HiFi-GAN, BigVGAN, and APNet.
+          </p>
+        </div>
+
+        <div class="container pt-5 mt-5 shadow p-5 mb-5 bg-white rounded">
+          <h2 id="content-samples" style="text-align: center;">Approach </h2>
+          <br>
+          <h3 style="text-align: center;">MS-SB-CQT Discriminator</h3>
+          <p>As illustrated below, the MS-SB-CQT Discriminator consists of identically structured
+            sub-discriminators operating on CQT spectrograms with different time-frequency resolution distributions. In
+            each
+            sub-discriminator, the real and imaginary parts of the CQT spectrogram will be sent individually to our
+            proposed
+            Sub-Band Processing (SBP) module to get their latent representations. These two representations will then be
+            concatenated and sent to convolutional layers to get the outputs for computing loss.</p>
+          <p style="text-align: center;">
+            <img src="assets/pics/SBCQTD.png" style="width:80%;" class="toEnlargeImg">
+            <br>
+            Architecture of the Sub-Discriminator in MS-SB-CQT Discriminator. Operator ''C'' denotes for concatenation.
+            SBP means our proposed Sub-Band Processor module. It can be observed that the desynchronized CQT Spectrogram
+            (bottom-right) has been synchronized (upper-right) after SBP.
+          </p>
+          <br>
+          <h3 style="text-align: center;">MS-MW-CWT Discriminator
+          </h3>
+          <p>As illustrated below, the MS-MW-CWT Discriminator consists of identically structured
+            sub-discriminators operating on CWT spectrograms with different wavelets and different amounts of wavelet
+            scales.
+            In each sub-discriminator, the CWT spectrogram will be sent to a series of Conv2d layers that only operate
+            on the
+            time dimension to obtain its time-domain compressed representation. The processed representation will then
+            be sent
+            to convolutional layers to get the outputs for computing loss.</p>
+          <p style="text-align: center;">
+            <img src="assets/pics/TCCWTD.png" style="width:80%;" class="toEnlargeImg">
+            <br>
+            Architecture of the Sub-Discriminator in MS-TC-CWT Discriminator. Operator ''C'' denotes for concatenation.
+            TC means our proposed Temporal Compressor module. Comp is a series of temporal-overlapped convolution
+            layers. K is the total number of frequency bins. It can be observed that the CWT Spectrogram
+            (bottom-right) can be compressed while maintaining the overall energy distribution over different frequency
+            bins (upper-right).
+          </p>
+        </div>
+
+        <div class="container pt-5 mt-5 shadow p-5 mb-5 bg-white rounded">
+          <h2 id="content-samples" style="text-align: center;">Effectiveness of the Proposed Discriminators and Using
+            Them Jointly </h2>
+          <p style="text-align: center;">
+            <img src="assets/pics/exp_1.jpg" width="90%" class="toEnlargeImg">
+            <br>
+            Analysis-synthesis results of different discriminators when being integrated into HiFi-GAN. The best and the
+            second best results of every column (except those from
+            Ground Truth) in each domain (speech and singing voice) are <b>bold</b> and <i>italic</i>.
+            "S", "C" and "W" represent MS-STFT, MS-SB-CQT and MS-TC-CWT Discriminators respectively. The MOS scores are
+            with 95% Confidence Interval (CI).
+          </p>
+          <p>
+            As illustrated above, regarding singing voice, we can observe that:
+            <br>
+
+            <b>(1)</b> HiFi-GAN (+S), HiFi-GAN (+C), and HiFi-GAN (+W) all outperform HiFi-GAN both subjectively and
+            objectively, confirming the importance of the extra adversarial losses in the frequency domain;
+            <br>
+
+            <b>(2)</b> Both HiFi-GAN (+C) and HiFi-GAN (+W) outperform the HiFi-GAN (+S) objectively and subjectively,
+            illustrating the effectiveness of utilizing TFRs with dynamic TF resolution;
+            <br>
+
+            <b>(3)</b> HiFi-GAN (+C) outperforms HiFi-GAN (+W) objectively especially on F0-related metrics, showing the
+            effectiveness of the pitch-aware center frequency distribution. HiFi-GAN (+W) outperforms HiFi-GAN (+C)
+            subjectively, showing the effectiveness of the diverse energy-centered wavelet basis;
+            <br>
+
+            <b>(4)</b> HiFi-GAN (+S+C+W) outperforms both objectively and subjectively on seen singers while holding
+            better objective results with a similar subjective score on unseen singers, confirming the effectiveness of
+            joint training.
+            <br>
+
+            A similar conclusion can be drawn for the unseen speaker evaluation of speech data.
+          </p>
+          <p>
+            Here, we show some representative samples to reveal the effctiveness of our proposed methods and the
+            complementary role of the discriminators based on different TFRs.
+          </p>
+
+          <h3 style="text-align: center;">Representative Samples</h3>
+
+          <h4>Seen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">HiFi-GAN</th>
+                  <th style="text-align: center">HiFi-GAN (+S)</th>
+                  <th style="text-align: center">HiFi-GAN (+C)</th>
+                  <th style="text-align: center">HiFi-GAN (+W)</th>
+                  <th style="text-align: center">HiFi-GAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_2_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_2_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_2_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_3_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_3_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_3_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4>Unseen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">HiFi-GAN</th>
+                  <th style="text-align: center">HiFi-GAN (+S)</th>
+                  <th style="text-align: center">HiFi-GAN (+C)</th>
+                  <th style="text-align: center">HiFi-GAN (+W)</th>
+                  <th style="text-align: center">HiFi-GAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_1_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_1_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_1_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_2_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_2_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_2_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_3_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_3_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_3_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4>Seen Speakers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">HiFi-GAN</th>
+                  <th style="text-align: center">HiFi-GAN (+S)</th>
+                  <th style="text-align: center">HiFi-GAN (+C)</th>
+                  <th style="text-align: center">HiFi-GAN (+W)</th>
+                  <th style="text-align: center">HiFi-GAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_1_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_1_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_1_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_2_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_2_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_2_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_3_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_3_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_3_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_speaker_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4>Unseen Speakers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">HiFi-GAN</th>
+                  <th style="text-align: center">HiFi-GAN (+S)</th>
+                  <th style="text-align: center">HiFi-GAN (+C)</th>
+                  <th style="text-align: center">HiFi-GAN (+W)</th>
+                  <th style="text-align: center">HiFi-GAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_1_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_1_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_1_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_2_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_2_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_2_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_3_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_3_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_3_mscwtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/unseen_speaker_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <!-- <h3 style="text-align: center;"> Case Study</h3> -->
+          <!-- <p>We visualized the same singing voice utterance synthesized by generators trained with different
+            discriminator combinations. It can be observed that:</p>
+          <p><b>(1)</b> With only the time-domain-based discriminators, it is hard for our generator to model
+            the high-frequency parts. Adding time-frequency-representation-based discriminators, neither
+            MS-SB-CQT Discriminator (HiFi-GAN (+C)) or MS-STFT Discriminator (HiFi-GAN (+S)), significantly
+            boosts the quality of high-frequency reconstruction.</p>
+          <p><b>(2)</b> STFT has a fixed time-frequency resolution across all frequency bands. In the
+            low-frequency parts, its lack of frequency resolution brings frequency distortions, resulting in
+            phonemes with artifacts. In the high-frequency parts, its lack of time resolution limits it from
+            reconstructing harmonic components. CQT has a dynamic resolution trade-off, thus alleviating
+            these artifacts. However, its lack of time resolution in the low-frequency parts and the lack of
+            frequency resolution in the high-frequency parts still bring problems like glitches and hissing
+            noises.</p>
+          <p><b>(3)</b> Combining STFT-based and CQT-based Discriminators integrates their strengths, thus
+            attaining a significantly better synthesis quality.</p> -->
+          <!-- <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">HiFi-GAN</th>
+                  <th style="text-align: center">HiFi-GAN (+S)</th>
+                  <th style="text-align: center">HiFi-GAN (+C)</th>
+                  <th style="text-align: center">HiFi-GAN (+W)</th>
+                  <th style="text-align: center">HiFi-GAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_msstftd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/effectiveness/seen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/effectiveness/seen_singer_1_gt_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/effectiveness/seen_singer_1_orig_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/effectiveness/seen_singer_1_msstftd_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/effectiveness/seen_singer_1_mscqtd_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/effectiveness/seen_singer_1_merge_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    能不能给我一首歌的时间
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    <b><em>能</em></b>不能给我<b><em>一</em></b>首歌的时间
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    能不能给我<b><em>一</em></b>首<b><em>歌</em></b>的<b><em>时</em></b>间
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    能不能<b><em>给</em></b>我一首<b><em>歌</em></b>的时间
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    能不能给我一首歌的时间
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    néng bù néng gěi wǒ yī shǒu gē de shí jiān
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    <b><em>néng</em></b> bù néng gěi wǒ <b><em>yī</em></b> shǒu gē de shí jiān
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    néng bù néng gěi wǒ <b><em>yī</em></b> shǒu <b><em>gē</em></b> de
+                    <b><em>shí</em></b> jiān
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    néng bù néng <b><em>gěi</em></b> wǒ yī shǒu <b><em>gē</em></b> de shí jiān
+                  </td>
+                  <td style="text-align: left;vertical-align:middle;width: 500px">
+                    néng bù néng gěi wǒ yī shǒu gē de shí jiān
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div> -->
+        </div>
+        <div class="container pt-5 mt-5 shadow p-5 mb-5 bg-white rounded">
+          <h2 id="content-samples" style="text-align: center;">Effectiveness of Proposed Training Strategy </h2>
+          <p style="text-align: center;">
+            <img src="assets/pics/exp_2.jpg" width="90%" class="toEnlargeImg">
+            <br>
+            Analysis-synthesis results of our proposed Discriminators when applying on NSF-HiFiGAN, BigVGAN, and APNet
+            in singing voice datasets. The improvements are shown in
+            <b>bold</b>. "S", "C" and "W" represent MS-STFT, MS-SB-CQT and MS-TC-CWT Discriminators respectively.
+          </p>
+          <p>
+            Here, we show some representative samples to reveal the effctiveness of joint training
+            with our proposed discriminators on different generators.
+          </p>
+
+          <h3 style="text-align: center;">Representative Samples</h3>
+
+          <h4 style="text-align: center;">NSF-HiFiGAN</h4>
+          <h4>Seen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">NSF-HiFiGAN</th>
+                  <th style="text-align: center">NSF-HiFiGAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4>Unseen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">NSF-HiFiGAN</th>
+                  <th style="text-align: center">NSF-HiFiGAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/unseen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4 style="text-align: center;">BigVGAN</h4>
+          <h4>Seen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">BigVGAN</th>
+                  <th style="text-align: center">BigVGAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/seen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4>Unseen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">BigVGAN</th>
+                  <th style="text-align: center">BigVGAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/bigvgan/unseen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4 style="text-align: center;">APNet</h4>
+          <h4>Seen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">APNet</th>
+                  <th style="text-align: center">APNet (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/seen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <h4>Unseen Singers</h4>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">APNet</th>
+                  <th style="text-align: center">APNet (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/apnet/unseen_singer_3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <br>
+          <br>
+          <!-- <h3 style="text-align: center;"> Case Study </h3>
+          <h4 style="text-align: center;">NSF-HiFiGAN</h4>
+          <p>NSF-HiFiGAN can synthesize high-fidelity singing voices. However, it still lacks
+            <b>frequency details</b>. Adding MS-STFT and MS-SB-CQT Discrimina-tors tackles that problem,
+            making
+            synthesized samples closer to the
+            ground truth.
+          </p>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">NSF-HiFiGAN</th>
+                  <th style="text-align: center">NSF-HiFiGAN (+S+C+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/generalization/nsfhifigan/seen_singer_2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/generalization/nsfhifigan/seen_singer_2_gt_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/generalization/nsfhifigan/seen_singer_2_orig_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                  <td style="text-align: center;vertical-align:middle">
+                    <picture controls="controls" style="width: 210px;">
+                      <img src="assets/pics/generalization/nsfhifigan/seen_singer_2_merge_drawio.png"
+                        alt="Your browser does not support the img element." class="toEnlargeImg">
+                    </picture>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div> -->
+        </div>
+        <div class="container pt-5 mt-5 shadow p-5 mb-5 bg-white rounded">
+          <h2 id="content-samples" style="text-align: center;">Ablation Studies </h2>
+          <p style="text-align: center;">
+            <img src="assets/pics/exp_3.png" width="90%" class="toEnlargeImg">
+            <br>
+            Analysis-synthesis results of HiFi-GAN enhanced by discriminators with varied modules and processing
+            techniques. The improvements are shown in <b>bold</b>. "C" and "W" represent MS-SB-CQT and MS-TC-CWT
+            Discriminators respectively.
+          </p>
+          <p>
+            Here, we show some representative cases to reveal the effctiveness of our proposed methods. We use HiFi-GAN
+            (w/o) to denote the HiFi-GAN trained without our proposed methods.
+          </p>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">HiFi-GAN</th>
+                  <th style="text-align: center">HiFi-GAN (w/o)</th>
+                  <th style="text-align: center">HiFi-GAN (+W)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/1_none.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/1_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/2_none.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/2_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/3_none.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cwt/3_merge.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-responsive pt-3">
+            <table class="table table-hover pt-2">
+              <thead>
+                <tr>
+                  <th style="text-align: center"></th>
+                  <th style="text-align: center">Ground Truth</th>
+                  <th style="text-align: center">HiFi-GAN</th>
+                  <th style="text-align: center">HiFi-GAN (w/o)</th>
+                  <th style="text-align: center">HiFi-GAN (+C)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#1</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/1_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/1_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/1_mscqtd_none.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/1_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#2</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/2_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/2_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/2_mscqtd_none.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/2_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody>
+                <tr style="background-color: #e7ecec;">
+                  <td style="text-align: left;vertical-align:middle;width: 72px">
+                    <b>#3</b>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/3_gt.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/3_orig.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/3_mscqtd_none.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                  <td style="text-align: center">
+                    <audio style="width: 210px;" controls="controls" preload="auto">
+                      <source src="assets/audios/ablation/cqt/3_mscqtd.wav" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    </main>
+  </div>
+
+</body>
+
+<script>
+  let black_overlay = document.getElementById('black_overlay');
+  let enlargeContainer = document.getElementById('enlargeContainer');
+  let closeBtn = document.getElementById('close');
+
+  let toEnlargeImgs = document.getElementsByClassName('toEnlargeImg');
+  for (let toEnlargeImg of toEnlargeImgs) {
+    toEnlargeImg.addEventListener('click', function () {
+      // 获取当前图片的路径
+      let imgUrl = this.src;
+      // 显示黑色遮罩和预览容器
+      black_overlay.style.display = 'block';
+      enlargeContainer.style.display = 'block';
+      let img = new Image();
+      img.src = imgUrl;
+      img.classList.add('enlargePreviewImg');
+      if (closeBtn.nextElementSibling) {
+        enlargeContainer.removeChild(closeBtn.nextElementSibling);
+      }
+      enlargeContainer.appendChild(img);
+    });
+  }
+
+  // 关闭预览
+  closeBtn.addEventListener('click', function () {
+    black_overlay.style.display = 'none';
+    enlargeContainer.style.display = 'none';
+  });
+</script>
+
+</html>
